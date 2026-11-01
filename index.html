@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoAI Monitor - ЮНИИИТ</title>
+    <style>
+        /* Сброс стилей и базовая настройка */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: #111827; color: #f3f4f6; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Шапка */
+        header { height: 64px; background-color: #1f2937; border-bottom: 1px solid #374151; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; flex-shrink: 0; }
+        .logo-area { display: flex; align-items: center; gap: 12px; }
+        .logo { background-color: #10b981; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 14px; color: #fff; }
+        .status { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #9ca3af; }
+        .pulse { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; }
+
+        /* Главный контейнер */
+        .main-container { display: flex; flex-direction: row; flex-grow: 1; height: calc(100vh - 64px); width: 100%; overflow: hidden; }
+
+        /* ИСПРАВЛЕНО: Боковая панель теперь имеет независимый внутренний скролл */
+        aside { 
+            width: 384px; 
+            min-width: 384px; 
+            background-color: #1f2937; 
+            border-right: 1px solid #374151; 
+            padding: 24px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            flex-shrink: 0;
+            overflow-y: auto; /* Включает вертикальную прокрутку, если контент не влезает */
+        }
+        
+        .content-group { flex-grow: 1; }
+        .section { margin-bottom: 24px; }
+        .label { font-size: 14px; color: #9ca3af; font-weight: 500; margin-bottom: 8px; display: block; }
+        
+        /* Кнопка-дропзона загрузки */
+        .dropzone { border: 2px dashed #4b5563; border-radius: 12px; padding: 24px; text-align: center; cursor: pointer; background-color: #111827; transition: border-color 0.2s; }
+        .dropzone:hover { border-color: #10b981; }
+        .dropzone-text { font-size: 14px; margin-top: 8px; display: block; color: #e5e7eb; }
+        .dropzone-sub { font-size: 12px; color: #6b7280; margin-top: 4px; display: block; }
+        .dropzone svg { width: 32px; height: 32px; display: block; margin: 0 auto; }
+
+        /* Чекбоксы классов */
+        .class-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+        .class-item { display: flex; align-items: center; padding: 10px; background-color: #111827; border: 1px solid #374151; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .class-item input { margin-right: 12px; width: 16px; height: 16px; accent-color: #10b981; cursor: pointer; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+
+        /* Метрики снизу панели */
+        .stats { border-top: 1px solid #374151; padding-top: 16px; margin-top: 24px; flex-shrink: 0; }
+        .stats-title { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; font-weight: bold; }
+        .stats-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
+        .stats-val { font-weight: bold; color: #10b981; }
+
+        /* Правая часть: Окно просмотра снимка */
+        .viewer-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; position: relative; overflow: hidden; }
+        .gis-grid { position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(51, 65, 85, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(51, 65, 85, 0.15) 1px, transparent 1px); background-size: 30px 30px; }
+        
+        /* Квадратный экран 1:1 под будущие тайлы 1024х1024 */
+        .image-screen { width: 100%; max-width: 600px; aspect-ratio: 1 / 1; background-color: #1e293b; border: 2px solid #334155; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); position: relative; overflow: hidden; }
+        .screen-placeholder { text-align: center; color: #64748b; z-index: 1; padding: 20px; }
+        .screen-placeholder svg { width: 48px; height: 48px; margin-bottom: 12px; display: block; margin: 0 auto 12px auto; }
+    </style>
+</head>
+<body>
+
+    <!-- Шапка -->
+    <header>
+        <div class="logo-area">
+            <div class="logo">GeoAI</div>
+            <h2>Мониторинг ДЗЗ Югры</h2>
+        </div>
+        <div class="status">
+            <span class="pulse"></span>
+            <span>Система готова к работе</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Боковая панель управления -->
+        <aside>
+            <!-- Обертка для верхней группы контента -->
+            <div class="content-group">
+                <!-- Загрузка -->
+                <div class="section">
+                    <span class="label">Шаг 1: Загрузка GeoTIFF снимка</span>
+                    <div class="dropzone" onclick="document.getElementById('fileInput').click()">
+                        <input type="file" id="fileInput" accept=".tif,.tiff" style="display: none;" onchange="showPreview(this)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                        <span class="dropzone-text">Кликните для выбора файла</span>
+                        <span class="dropzone-sub">Поддержка файлов до 500 МБ</span>
+                    </div>
+                </div>
+
+                <!-- Классы объектов -->
+                <div class="section">
+                    <span class="label">Шаг 2: Слои распознавания</span>
+                    <div class="class-list">
+                        <label class="class-item"><input type="checkbox" checked><span class="dot" style="background-color: #ef4444;"></span>Лесные пожары / гари</label>
+                        <label class="class-item"><input type="checkbox" checked><span class="dot" style="background-color: #f97316;"></span>Вырубки леса</label>
+                        <label class="class-item"><input type="checkbox" checked><span class="dot" style="background-color: #a855f7;"></span>Нефтегазовые объекты</label>
+                        <label class="class-item"><input type="checkbox" checked><span class="dot" style="background-color: #eab308;"></span>Дорожная сеть</label>
+                        <label class="class-item"><input type="checkbox" checked><span class="dot" style="background-color: #3b82f6;"></span>Водные объекты</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Метрики эффективности -->
+            <div class="stats">
+                <div class="stats-title">Эффективность автоматизации</div>
+                <div class="stats-row"><span>Снижение ручного труда:</span><span class="stats-val">≥ 70%</span></div>
+                <div class="stats-row"><span>Целевой mIoU:</span><span class="stats-val" style="color: #3b82f6;">0.75</span></div>
+            </div>
+        </aside>
+
+        <!-- Рабочая зона с экраном для снимков -->
+        <main class="viewer-container">
+            <div class="gis-grid"></div>
+            
+            <!-- Фиксированное окно просмотра -->
+            <div class="image-screen" id="screen">
+                <div class="screen-placeholder" id="placeholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 0 1 9-9"/></svg>
+                    <p style="font-weight: 500; margin-bottom: 4px;">Экран отображения космоснимка</p>
+                    <p style="font-size: 13px; color: #475569;">Здесь будет выведен тайл 1024x1024 и маски ИИ</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function showPreview(input) {
+            if (input.files && input.files[0]) {
+                const placeholder = document.getElementById('placeholder');
+                placeholder.innerHTML = `
+                    <div style="color: #10b981; font-weight: bold; text-align: center;">
+                        <p style="font-size: 18px; margin-bottom: 6px;">✓ Снимок принят</p>
+                        <p style="font-size: 14px; color: #94a3b8; font-weight: normal; max-width: 300px; word-break: break-all; margin: 0 auto;">${input.files[0].name}</p>
+                        <p style="font-size: 12px; color: #64748b; font-weight: normal; margin-top: 16px;">[Ожидание обработки на FastAPI...]</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
